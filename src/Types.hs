@@ -1,8 +1,6 @@
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE NamedFieldPuns             #-}
 {-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE RecordWildCards            #-}
 {-# OPTIONS_GHC -Wall            #-}
 
 module Types where
@@ -32,7 +30,7 @@ data Gender = Total | Male | Female
 
 
 data Stat
-  = Population              -- 1
+  = Population              -- 8
   | Population2011          -- 2
   | Population20'24         -- 15
   | Population25'29         -- 16
@@ -54,6 +52,7 @@ data Stat
   | HasBachelors            -- 1692
   | HasMasters              -- 1696
   | HasPhD                  -- 1697
+  | StudiedMusic            -- 1717
   | StudiedHumanities       -- 1720
   | StudiedSocialSciences   -- 1729
   | StudiedScience          -- 1741
@@ -62,6 +61,7 @@ data Stat
   | IsEmployee              -- 1882
   | IsSelfEmployed          -- 1883
   | Professionals           -- 1911
+  | ProfessionalArtists     -- 1916
   | TotalCommuters          -- 1930
   | BusCommuters            -- 1933
   | WalkingCommuters        -- 1934
@@ -73,7 +73,7 @@ data Stat
   deriving (Eq, Show)
 
 instance Enum Stat where
-  fromEnum Population             = 1
+  fromEnum Population             = 8
   fromEnum Population2011         = 2
   fromEnum Population20'24        = 15
   fromEnum Population25'29        = 16
@@ -95,6 +95,7 @@ instance Enum Stat where
   fromEnum HasBachelors           = 1692
   fromEnum HasMasters             = 1696
   fromEnum HasPhD                 = 1697
+  fromEnum StudiedMusic           = 1717
   fromEnum StudiedHumanities      = 1720
   fromEnum StudiedSocialSciences  = 1729
   fromEnum StudiedScience         = 1741
@@ -103,6 +104,7 @@ instance Enum Stat where
   fromEnum IsEmployee             = 1882
   fromEnum IsSelfEmployed         = 1883
   fromEnum Professionals          = 1911
+  fromEnum ProfessionalArtists    = 1916
   fromEnum TotalCommuters         = 1930
   fromEnum BusCommuters           = 1933
   fromEnum WalkingCommuters       = 1934
@@ -144,16 +146,20 @@ buildName :: ByteString -> ByteString -> ByteString
 buildName n1 n2 = n1 <> "+" <> n2
 
 instance Num Statistic where
-  (+)         = liftNum (+)
-  (*)         = liftNum (*)
-  (-)         = liftNum (-)
-  abs         = error "abs"
-  signum      = error "signum"
-  fromInteger = error "fromInteger"
+  (+)           = liftNum (+)
+  (*)           = liftNum (*)
+  (-)           = liftNum (-)
+  abs           = error "abs"
+  signum        = error "signum"
+  fromInteger a = Statistic "" (Just $ fromInteger a)
+                               (Just $ fromInteger a)
+                               (Just $ fromInteger a)
 
 instance Fractional Statistic where
-  (/)          = liftNum (/)
-  fromRational = error "fromRational"
+  (/)            = liftNum (/)
+  fromRational a = Statistic "" (Just $ fromRational a)
+                                (Just $ fromRational a)
+                                (Just $ fromRational a)
 
 
 data City = City

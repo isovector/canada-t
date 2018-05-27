@@ -1,4 +1,6 @@
+{-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NamedFieldPuns             #-}
 {-# LANGUAGE OverloadedStrings          #-}
@@ -9,31 +11,93 @@
 
 module Lib where
 
+import           Control.Monad
 import           Control.Monad.Trans.Maybe
 import           Control.Monad.Trans.Reader
 import           Data.Bifunctor
-import qualified Data.ByteString.Lazy as BS
-import           Data.Csv
 import           Data.Foldable (for_)
-import           Data.Function
 import qualified Data.IntMap.Strict as IM
 import           Data.List (sortBy)
-import           Data.Maybe
 import           Data.Ord
-import           Data.Ratio
 import           Data.Vector (Vector)
 import qualified Data.Vector as V
+import           Parse
 import           Types
+
+
+unboundedFloor :: (Monad m, Floating a, Ord a) => a -> a -> QueryT m a
+unboundedFloor l v = do
+  guard $ l < v
+  pure $ log (v - l) / log 10
+
+unboundedCeil :: (Monad m, Floating a, Ord a) => a -> a -> QueryT m a
+unboundedCeil u v = do
+  guard $ v < u
+  pure $ log (u - v) / log 10
+
+unboundedDist :: (Monad m, Floating a, Ord a) => a -> a -> a -> QueryT m a
+unboundedDist x m v = do
+  pure $ x - (log (abs $ m - v) / log 10)
+
+
+data SumList a = SumList { unSumList :: [a] }
+  deriving (Eq, Functor)
+
+instance Show a => Show (SumList a) where
+  show (SumList a) = show a
+
+instance (Num a, Ord a) => Ord (SumList a) where
+  compare = comparing $ sum . unSumList
+
+bestCity :: Monad m => QueryT m (SumList Float)
+bestCity = do
+  let walkWeight = 5
+      busWeight  = 1
+
+
+  pop <- query Population Total
+
+  let ageStat = [ Population20'24
+                , Population25'29
+                , Population30'24
+                ]
+  -- inRange 20000 200000 pop
+
+  percSingle <- percentOfPopulation TotalUnmarried
+  percSmart  <- percentOfPopulation HasBachelors
+  datingPool <- query ageStat Female
+  ageGroup <- query ageStat Total
+
+  let percWomen = datingPool / ageGroup
+
+  myAge <- query Population25'29 Female >>= unboundedFloor 0
+
+  walkable <- percentOf [BikingCommuters, WalkingCommuters] TotalCommuters
+  busable  <- percentOf BusCommuters TotalCommuters
+  let walkableScore = walkable * walkWeight + busable * busWeight
+
+  myWomen <- unboundedFloor 0 $ datingPool * percSingle
+  apts <- query [HighDensityApartments, LowDensityApartments] Total >>= unboundedFloor 0
+
+  rent <- query MedianRent Total >>= unboundedCeil 1200
+  age <- query MedianAge Total >>= unboundedDist 3 28
+  culture <- percentOfPopulation [StudiedMusic, ProfessionalArtists]
+
+  pure $ fmap (rounding 2) $ SumList
+    [ percWomen
+    ]
+
+
+rounding :: RealFrac a => Int -> a -> a
+rounding p a = fromInteger (round (10^p * a)) / 10^p
 
 
 main :: IO ()
 main = do
   csv <- loadCSV
   let cs = getCities csv
-  best <- take 10 <$> rankBy (percentOfPopulation StudiedMath) cs
-  for_ best $ print . bimap cityName (fromRational @Float)
-
-
+  best <- take 10 <$> rankBy bestCity cs
+  for_ best $ print . bimap cityName id
 
 
 rankBy :: (Applicative m, Ord a) => QueryT m a -> Vector City -> m [(City, a)]
@@ -45,13 +109,21 @@ hoistMaybe :: Applicative m => Maybe a -> QueryT m a
 hoistMaybe = QueryT . ReaderT . const . MaybeT . pure
 
 
-getStatistic :: Monad m => Stat -> QueryT m Statistic
-getStatistic stat = do
-  City{cityData} <- QueryT ask
-  hoistMaybe $ IM.lookup (fromEnum stat) cityData
+class IsStat a where
+  getStatistic :: Monad m => a -> QueryT m Statistic
+
+instance IsStat Stat where
+  getStatistic stat = do
+    City{cityData} <- QueryT ask
+    hoistMaybe $ IM.lookup (fromEnum stat) cityData
+
+instance IsStat [Stat] where
+  getStatistic stats = do
+    s <- traverse getStatistic stats
+    pure $ sum s
 
 
-query :: Monad m => Stat -> Gender -> QueryT m Float
+query :: (Monad m, IsStat s) => s -> Gender -> QueryT m Float
 query stat g = do
   Statistic{..}  <- getStatistic stat
   hoistMaybe $
@@ -61,56 +133,17 @@ query stat g = do
       Female -> sFemale
 
 
-percentOfPopulation :: Monad m => Stat -> QueryT m Rational
-percentOfPopulation stat = do
-  n <- round <$> query stat Total
-  d <- round <$> query Population Total
-  pure $ n % d
+percentOfPopulation :: (Monad m, IsStat s) => s -> QueryT m Float
+percentOfPopulation s = percentOf s Population
 
 
-buildStat :: Row -> (Int, Statistic)
-buildStat Row{..} =
-  ( statKey
-  , Statistic
-      statName
-      (unpossible statTotal)
-      (unpossible statMale)
-      (unpossible statFemale)
-  )
+percentOf :: (Monad m, IsStat s1, IsStat s2) => s1 -> s2 -> QueryT m Float
+percentOf s1 s2 = do
+  n <- query s1 Total
+  d <- query s2 Total
+  pure $ n / d
 
 
-buildCity :: Vector Row -> City
-buildCity rs =
-  let Row{..} = V.head rs
-   in City geoCode geoName . IM.fromList . V.toList $ fmap buildStat rs
-
-
-getCities :: Vector Row -> Vector City
-getCities = fmap buildCity . groupBy ((==) `on` geoCode)
-
-
-stripUtf8Bom :: BS.ByteString -> BS.ByteString
-stripUtf8Bom bs = fromMaybe bs $ BS.stripPrefix "\239\187\191" bs
-
-
-groupBy :: (a -> a -> Bool) -> Vector a -> Vector (Vector a)
-groupBy eq v
-  | V.null v = V.empty
-  | otherwise =
-      let x        = V.head v
-          xs       = V.tail v
-          (ys, zs) = V.span (eq x) xs
-       in V.cons (V.cons x ys) $ groupBy eq zs
-
-
-loadCSV :: IO (Vector Row)
-loadCSV = do
-  bs <- stripUtf8Bom <$> BS.readFile "census.csv"
-  case decodeByName bs of
-    Left err -> putStrLn err >> undefined
-    Right res -> pure $ snd res
-
-
-someFunc :: IO ()
-someFunc = putStrLn "someFunc"
+inRange :: (Monad m, Ord a) => a -> a -> a -> QueryT m ()
+inRange l h v = guard $ l <= v && v <= h
 
