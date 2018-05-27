@@ -16,13 +16,13 @@ import qualified Data.IntMap.Strict as IM
 import           GHC.Generics (Generic)
 
 
-newtype Query a = Query
-  { unQuery :: ReaderT City Maybe a
+newtype Canada a = Canada
+  { unCanada :: ReaderT City Maybe a
   } deriving (Functor, Applicative, Monad, Alternative, MonadPlus)
 
 
-runQuery :: City -> Query a -> Maybe a
-runQuery c (Query q) = runReaderT q c
+ohCanada :: City -> Canada a -> Maybe a
+ohCanada c (Canada q) = runReaderT q c
 
 
 data Gender = Total | Male | Female

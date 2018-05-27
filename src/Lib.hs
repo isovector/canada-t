@@ -27,17 +27,17 @@ import           Parse
 import           Types
 
 
-unboundedFloor :: (Floating a, Ord a) => a -> a -> Query a
+unboundedFloor :: (Floating a, Ord a) => a -> a -> Canada a
 unboundedFloor l v = do
   guard $ l < v
   pure $ log (v - l) / log 10
 
-unboundedCeil :: (Floating a, Ord a) => a -> a -> Query a
+unboundedCeil :: (Floating a, Ord a) => a -> a -> Canada a
 unboundedCeil u v = do
   guard $ v < u
   pure $ log (u - v) / log 10
 
-unboundedDist :: (Floating a, Ord a) => a -> a -> a -> a -> Query a
+unboundedDist :: (Floating a, Ord a) => a -> a -> a -> a -> Canada a
 unboundedDist x s m v = do
   pure $ clamp 0 x $ x - ((v - m) / s)^2
 
@@ -54,13 +54,13 @@ instance Show a => Show (SumList a) where
 instance (Num a, Ord a) => Ord (SumList a) where
   compare = comparing $ sum . unSumList
 
-bestCity ::  Query (SumList Float)
+bestCity ::  Canada (SumList Float)
 bestCity = do
   let walkWeight = 5
       busWeight  = 1
 
 
-  pop <- query Population Total -- >>= unboundedFloor 10000
+  pop <- eh Population Total -- >>= unboundedFloor 10000
   guard $ pop >= 10000
 
   let ageStat = [ Population20'24
@@ -73,27 +73,27 @@ bestCity = do
 
   percSingle <- percentOfPopulation TotalUnmarried
   percSmart  <- percentOfPopulation HasBachelors
-  datingPool <- query ageStat Female
-  ageGroup   <- query ageStat Total
+  datingPool <- eh ageStat Female
+  ageGroup   <- eh ageStat Total
 
   let percWomen = datingPool / ageGroup
   -- guard $ percWomen > 0.5
 
-  myAge <- query Population25'29 Female >>= unboundedFloor 0
+  myAge <- eh Population25'29 Female >>= unboundedFloor 0
 
   walkable <- percentOf [BikingCommuters, WalkingCommuters] TotalCommuters
   busable  <- percentOf BusCommuters TotalCommuters
   let walkableScore = walkable * walkWeight + busable * busWeight
 
   myWomen <- unboundedFloor 5000 $ datingPool * percSingle
-  apts <- query [HighDensityApartments, LowDensityApartments] Total >>= unboundedFloor 0
+  apts <- eh [HighDensityApartments, LowDensityApartments] Total >>= unboundedFloor 0
 
-  rent <- query MedianRent Total
+  rent <- eh MedianRent Total
   guard $ rent <= 1400
 
   let rent' = (1400 - rent) / 1400 * 5
 
-  age <- query [MedianAge, AverageAge] Total >>= unboundedDist 3 20 (28 * 2)
+  age <- eh [MedianAge, AverageAge] Total >>= unboundedDist 3 20 (28 * 2)
   culture <- percentOfPopulation [StudiedMusic, ProfessionalArtists]
 
   pure $ fmap (rounding 2) $ SumList
@@ -120,24 +120,24 @@ main = do
   for_ best $ print . bimap cityName id
 
 
-rankBy :: (Ord a) => Query a -> [City] -> [(City, a)]
+rankBy :: (Ord a) => Canada a -> [City] -> [(City, a)]
 rankBy f = sortBy (flip $ comparing snd)
          . catMaybes
-         . fmap (\c -> fmap (c,) $ runQuery c f)
-         -- . traverse (\c -> fmap (c,) <$> runQuery c f)
+         . fmap (\c -> fmap (c,) $ ohCanada c f)
+         -- . traverse (\c -> fmap (c,) <$> ohCanada c f)
 
 
-hoistMaybe :: Maybe a -> Query a
-hoistMaybe = Query . ReaderT . const
+hoistMaybe :: Maybe a -> Canada a
+hoistMaybe = Canada . ReaderT . const
 {-# INLINE hoistMaybe #-}
 
 
 class IsStat a where
-  getStatistic :: a -> Query Statistic
+  getStatistic :: a -> Canada Statistic
 
 instance IsStat Stat where
   getStatistic stat = do
-    City{cityCode, cityData} <- Query ask
+    City{cityCode, cityData} <- Canada ask
     case IM.lookup (fromEnum stat) cityData of
       Just a -> pure a
       Nothing ->  error $ show stat ++ show cityCode
@@ -150,28 +150,28 @@ instance IsStat [Stat] where
   {-# INLINE getStatistic #-}
 
 
-query :: (IsStat s) => s -> Gender -> Query Float
-query stat g = do
+eh :: (IsStat s) => s -> Gender -> Canada Float
+eh stat g = do
   Statistic{..}  <- getStatistic stat
   hoistMaybe $
     case g of
       Total  -> sTotal
       Male   -> sMale
       Female -> sFemale
-{-# INLINE query #-}
+{-# INLINE eh #-}
 
 
-percentOfPopulation :: (IsStat s) => s -> Query Float
+percentOfPopulation :: (IsStat s) => s -> Canada Float
 percentOfPopulation s = percentOf s Population
 
 
-percentOf :: (IsStat s1, IsStat s2) => s1 -> s2 -> Query Float
+percentOf :: (IsStat s1, IsStat s2) => s1 -> s2 -> Canada Float
 percentOf s1 s2 = do
-  n <- query s1 Total
-  d <- query s2 Total
+  n <- eh s1 Total
+  d <- eh s2 Total
   pure $ n / d
 
 
-inRange :: (Ord a) => a -> a -> a -> Query ()
+inRange :: (Ord a) => a -> a -> a -> Canada ()
 inRange l h v = guard $ l <= v && v <= h
 

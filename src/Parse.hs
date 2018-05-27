@@ -6,7 +6,6 @@
 module Parse where
 
 import Data.List (groupBy)
-import qualified Data.Set as S
 import qualified Data.ByteString.Lazy as BS
 import           Data.Csv
 import           Data.Function
@@ -15,10 +14,6 @@ import           Data.Maybe
 import           Data.Vector (Vector)
 import qualified Data.Vector as V
 import           Types
-import Debug.Trace
-
-showTrace = trace =<< show
-
 
 
 buildStat :: Row -> (Int, Statistic)
@@ -40,7 +35,7 @@ buildStat = \Row{..} ->
 buildCity :: [Row] -> City
 buildCity rs =
   let Row{..} = head rs
-   in City (showTrace geoCode) geoName . IM.fromList $ fmap buildStat rs
+   in City geoCode geoName . IM.fromList $ fmap buildStat rs
 
 
 getCities :: Vector Row -> [City]
