@@ -22,6 +22,10 @@ newtype QueryT m a = QueryT
   } deriving (Functor, Applicative, Monad, Alternative, MonadPlus)
 
 
+runQueryT :: City -> QueryT m a -> m (Maybe a)
+runQueryT c (QueryT q) = runMaybeT $ runReaderT q c
+
+
 data Gender = Total | Male | Female
   deriving (Eq, Ord, Show, Bounded, Enum)
 
