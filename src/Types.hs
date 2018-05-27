@@ -14,6 +14,7 @@ import           Control.Monad.Trans.Reader
 import           Data.ByteString.Lazy (ByteString)
 import           Data.Csv
 import qualified Data.IntMap.Strict as IM
+import           Data.Monoid ((<>))
 import           GHC.Generics (Generic)
 
 
@@ -130,6 +131,29 @@ data Statistic = Statistic
   , sMale   :: Maybe Float
   , sFemale :: Maybe Float
   } deriving (Show)
+
+liftNum :: (Float -> Float -> Float) -> Statistic -> Statistic -> Statistic
+liftNum f s1 s2 = Statistic
+  { sName   = buildName (sName s1) (sName s2)
+  , sTotal  = f <$> sTotal  s1 <*> sTotal  s2
+  , sMale   = f <$> sMale   s1 <*> sMale   s2
+  , sFemale = f <$> sFemale s1 <*> sFemale s2
+  }
+
+buildName :: ByteString -> ByteString -> ByteString
+buildName n1 n2 = n1 <> "+" <> n2
+
+instance Num Statistic where
+  (+)         = liftNum (+)
+  (*)         = liftNum (*)
+  (-)         = liftNum (-)
+  abs         = error "abs"
+  signum      = error "signum"
+  fromInteger = error "fromInteger"
+
+instance Fractional Statistic where
+  (/)          = liftNum (/)
+  fromRational = error "fromRational"
 
 
 data City = City
