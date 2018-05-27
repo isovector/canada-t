@@ -1,9 +1,12 @@
+{-# LANGUAGE OverloadedLists   #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# OPTIONS_GHC -Wall          #-}
 
 module Parse where
 
+import Data.List (groupBy)
+import qualified Data.Set as S
 import qualified Data.ByteString.Lazy as BS
 import           Data.Csv
 import           Data.Function
@@ -12,46 +15,45 @@ import           Data.Maybe
 import           Data.Vector (Vector)
 import qualified Data.Vector as V
 import           Types
+import Debug.Trace
+
+showTrace = trace =<< show
+
 
 
 buildStat :: Row -> (Int, Statistic)
-buildStat Row{..} =
-  ( statKey
-  , Statistic
-      statName
-      (unpossible statTotal)
-      (unpossible statMale)
-      (unpossible statFemale)
-  )
+buildStat = \Row{..} ->
+  -- if S.member statKey set
+  --    then Just
+        ( statKey
+        , Statistic
+            (unpossible statTotal)
+            (unpossible statMale)
+            (unpossible statFemale)
+        )
+     -- else Nothing
+  -- where
+    -- set = [minBound .. maxBound]
 
 
-buildCity :: Vector Row -> City
+
+buildCity :: [Row] -> City
 buildCity rs =
-  let Row{..} = V.head rs
-   in City geoCode geoName . IM.fromList . V.toList $ fmap buildStat rs
+  let Row{..} = head rs
+   in City (showTrace geoCode) geoName . IM.fromList $ fmap buildStat rs
 
 
-getCities :: Vector Row -> Vector City
-getCities = fmap buildCity . groupBy ((==) `on` geoCode)
+getCities :: Vector Row -> [City]
+getCities = fmap buildCity . groupBy ((==) `on` geoCode). filter ((>= 1000) . geoCode) . V.toList
 
 
 stripUtf8Bom :: BS.ByteString -> BS.ByteString
 stripUtf8Bom bs = fromMaybe bs $ BS.stripPrefix "\239\187\191" bs
 
 
-groupBy :: (a -> a -> Bool) -> Vector a -> Vector (Vector a)
-groupBy eq v
-  | V.null v = V.empty
-  | otherwise =
-      let x        = V.head v
-          xs       = V.tail v
-          (ys, zs) = V.span (eq x) xs
-       in V.cons (V.cons x ys) $ groupBy eq zs
-
-
 loadCSV :: IO (Vector Row)
 loadCSV = do
-  bs <- stripUtf8Bom <$> BS.readFile "census.csv"
+  bs <- stripUtf8Bom <$> BS.readFile "census-more.csv"
   case decodeByName bs of
     Left err -> putStrLn err >> undefined
     Right res -> pure $ snd res

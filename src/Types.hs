@@ -1,32 +1,39 @@
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MagicHash                  #-}
 {-# LANGUAGE OverloadedStrings          #-}
-{-# OPTIONS_GHC -Wall            #-}
+{-# OPTIONS_GHC -Wall                   #-}
+{-# OPTIONS_GHC -funbox-strict-fields #-}
 
 module Types where
 
 import           Control.Applicative ((<|>), Alternative ())
 import           Control.Monad
-import           Control.Monad.Trans.Maybe
 import           Control.Monad.Trans.Reader
 import           Data.ByteString.Lazy (ByteString)
 import           Data.Csv
 import qualified Data.IntMap.Strict as IM
-import           Data.Monoid ((<>))
 import           GHC.Generics (Generic)
 
 
-newtype QueryT m a = QueryT
-  { unQueryT :: ReaderT City (MaybeT m) a
+newtype Query a = Query
+  { unQuery :: ReaderT City Maybe a
   } deriving (Functor, Applicative, Monad, Alternative, MonadPlus)
 
 
-runQueryT :: City -> QueryT m a -> m (Maybe a)
-runQueryT c (QueryT q) = runMaybeT $ runReaderT q c
+runQuery :: City -> Query a -> Maybe a
+runQuery c (Query q) = runReaderT q c
 
 
 data Gender = Total | Male | Female
   deriving (Eq, Ord, Show, Bounded, Enum)
+
+
+data KnownCity
+  = Vancouver -- 933
+  | Terrace -- 965
+  | London -- 555
+  | Waterloo -- 541
 
 
 data Stat
@@ -70,7 +77,7 @@ data Stat
   | CommuteTime15'29        -- 1939
   | FreshMigrants           -- 2234
   | RecentMigrants          -- 2243
-  deriving (Eq, Show)
+  deriving (Eq, Show, Bounded)
 
 instance Enum Stat where
   fromEnum Population             = 8
@@ -117,33 +124,27 @@ instance Enum Stat where
 
 
 data Row = Row
-  { geoCode    :: Int
+  { geoCode    :: !Int
   , geoName    :: ByteString
-  , statName   :: ByteString
-  , statKey    :: Int
-  , statTotal  :: Possibly Float
-  , statMale   :: Possibly Float
-  , statFemale :: Possibly Float
+  , statKey    :: !Int
+  , statTotal  :: !(Possibly Float)
+  , statMale   :: !(Possibly Float)
+  , statFemale :: !(Possibly Float)
   } deriving (Generic, Show)
 
 
 data Statistic = Statistic
-  { sName   :: ByteString
-  , sTotal  :: Maybe Float
-  , sMale   :: Maybe Float
-  , sFemale :: Maybe Float
+  { sTotal  :: !(Maybe Float)
+  , sMale   :: !(Maybe Float)
+  , sFemale :: !(Maybe Float)
   } deriving (Show)
 
 liftNum :: (Float -> Float -> Float) -> Statistic -> Statistic -> Statistic
 liftNum f s1 s2 = Statistic
-  { sName   = buildName (sName s1) (sName s2)
-  , sTotal  = f <$> sTotal  s1 <*> sTotal  s2
+  { sTotal  = f <$> sTotal  s1 <*> sTotal  s2
   , sMale   = f <$> sMale   s1 <*> sMale   s2
   , sFemale = f <$> sFemale s1 <*> sFemale s2
   }
-
-buildName :: ByteString -> ByteString -> ByteString
-buildName n1 n2 = n1 <> "+" <> n2
 
 instance Num Statistic where
   (+)           = liftNum (+)
@@ -151,15 +152,15 @@ instance Num Statistic where
   (-)           = liftNum (-)
   abs           = error "abs"
   signum        = error "signum"
-  fromInteger a = Statistic "" (Just $ fromInteger a)
-                               (Just $ fromInteger a)
-                               (Just $ fromInteger a)
+  fromInteger a = Statistic (Just $ fromInteger a)
+                            (Just $ fromInteger a)
+                            (Just $ fromInteger a)
 
 instance Fractional Statistic where
   (/)            = liftNum (/)
-  fromRational a = Statistic "" (Just $ fromRational a)
-                                (Just $ fromRational a)
-                                (Just $ fromRational a)
+  fromRational a = Statistic (Just $ fromRational a)
+                             (Just $ fromRational a)
+                             (Just $ fromRational a)
 
 
 data City = City
