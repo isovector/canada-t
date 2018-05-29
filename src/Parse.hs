@@ -39,7 +39,11 @@ buildCity rs =
 
 
 getCities :: Vector Row -> [City]
-getCities = fmap buildCity . groupBy ((==) `on` geoCode). filter ((>= 1000) . geoCode) . V.toList
+getCities = fmap buildCity
+          . groupBy ((==) `on` geoCode)
+          . filter ((/= "Greater Vancouver A") . geoName)
+          . filter ((>= 1000) . geoCode)
+          . V.toList
 
 
 stripUtf8Bom :: BS.ByteString -> BS.ByteString

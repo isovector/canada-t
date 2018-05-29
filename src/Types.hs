@@ -30,10 +30,24 @@ data Gender = Total | Male | Female
 
 
 data KnownCity
-  = Vancouver -- 933
-  | Terrace -- 965
-  | London -- 555
-  | Waterloo -- 541
+  = Vancouver    -- 5915022
+  | Terrace      -- 5949011
+  | London       -- 3539036
+  | Waterloo     -- 3530016
+  | Mississauga  -- 3521005
+  deriving (Eq, Show, Ord, Bounded)
+
+instance Enum KnownCity where
+  enumFromTo a b = filter (\x -> a <= x && x <= b) cities
+    where
+      cities = [Vancouver, Terrace, London, Waterloo, Mississauga]
+
+  fromEnum Vancouver   = 5915022
+  fromEnum Terrace     = 5949011
+  fromEnum London      = 3539036
+  fromEnum Waterloo    = 3530016
+  fromEnum Mississauga = 3521005
+  toEnum = error "nope"
 
 
 data Stat
@@ -50,10 +64,12 @@ data Stat
   | LowDensityApartments    -- 48
   | TotalMarried            -- 59
   | TotalUnmarried          -- 63
+  | FrenchOnlySpeakers      -- 102
   | MedianIncomeAfterTaxes  -- 746
   | Immigrants              -- 1139
   | HouseOwners             -- 1618
   | Renters                 -- 1619
+  | AffordableRenters       -- 1668
   | MedianRent              -- 1681
   | AverageRent             -- 1682
   | HasBachelors            -- 1692
@@ -93,10 +109,12 @@ instance Enum Stat where
   fromEnum LowDensityApartments   = 48
   fromEnum TotalMarried           = 59
   fromEnum TotalUnmarried         = 63
+  fromEnum FrenchOnlySpeakers     = 102
   fromEnum MedianIncomeAfterTaxes = 746
   fromEnum Immigrants             = 1139
   fromEnum HouseOwners            = 1618
   fromEnum Renters                = 1619
+  fromEnum AffordableRenters      = 1668
   fromEnum MedianRent             = 1681
   fromEnum AverageRent            = 1682
   fromEnum HasBachelors           = 1692
