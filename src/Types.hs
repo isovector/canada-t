@@ -35,18 +35,22 @@ data KnownCity
   | London       -- 3539036
   | Waterloo     -- 3530016
   | Mississauga  -- 3521005
+  | Gatineau     -- 2481017
+  | Ottawa       -- 3506008
   deriving (Eq, Show, Ord, Bounded)
 
 instance Enum KnownCity where
   enumFromTo a b = filter (\x -> a <= x && x <= b) cities
     where
-      cities = [Vancouver, Terrace, London, Waterloo, Mississauga]
+      cities = [Vancouver, Terrace, London, Waterloo, Mississauga, Gatineau, Ottawa]
 
   fromEnum Vancouver   = 5915022
   fromEnum Terrace     = 5949011
   fromEnum London      = 3539036
   fromEnum Waterloo    = 3530016
   fromEnum Mississauga = 3521005
+  fromEnum Gatineau    = 2481017
+  fromEnum Ottawa      = 3506008
   toEnum = error "nope"
 
 

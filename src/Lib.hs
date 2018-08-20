@@ -203,8 +203,8 @@ main = do
   csv <- loadCSV
   putStrLn "loaded yo"
   let known = fromEnum <$> [minBound @KnownCity .. maxBound]
-      -- cs = filter (flip elem known . cityCode) $ getCities csv
-      cs = getCities csv
+      cs = filter (flip elem known . cityCode) $ getCities csv
+      -- cs = getCities csv
 
   putStrLn "citied yo"
   let best = scoring allMetrics cs
